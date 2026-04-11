@@ -173,6 +173,29 @@ body {
     border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Encoder badge — shows GPU or CPU next to the version */
+.encoder-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    letter-spacing: 0.08em;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+    cursor: default;
+    transition: var(--transition);
+}
+.encoder-gpu {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+}
+.encoder-cpu {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary);
+}
+
 .subtitle {
     color: var(--text-secondary);
     font-size: 0.875rem;

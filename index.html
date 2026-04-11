@@ -19,6 +19,7 @@
                             <span class="repo-name">parsherr/Klypify</span>
                         </button>
                         <span class="version-badge">v1.4</span>
+                        <span id="encoderBadge" class="encoder-badge encoder-cpu" title="Active video encoder">CPU</span>
                     </div>
                 </div>
                 <div class="logo-container">
@@ -826,6 +827,15 @@
         // Sayfa yüklendiğinde son output path'i yükle
         window.addEventListener('DOMContentLoaded', () => {
             ipcRenderer.send('load-last-output');
+            ipcRenderer.send('get-encoder-info');
+        });
+
+        ipcRenderer.on('encoder-info', (event, info) => {
+            const badge = document.getElementById('encoderBadge');
+            if (!badge) return;
+            badge.textContent = info.isGPU ? 'GPU' : 'CPU';
+            badge.title = `Active encoder: ${info.label}`;
+            badge.className = `encoder-badge ${info.isGPU ? 'encoder-gpu' : 'encoder-cpu'}`;
         });
     </script>
 

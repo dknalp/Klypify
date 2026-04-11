@@ -3,6 +3,8 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs-extra');
 const crypto = require('crypto');
+const os = require('os');
+const { exec } = require('child_process');
 
 // Remove default menu
 Menu.setApplicationMenu(null);
@@ -80,6 +82,67 @@ async function setupFFmpegBinaries() {
     return { ffmpegPath, ffprobePath };
 }
 
+// ─── GPU Encoder Detection ────────────────────────────────────────────────────
+
+// Cached encoder config — set once at startup, used by all encode calls
+let gpuEncoderConfig = null;
+
+// Returns the encoder config object after probing available hardware encoders.
+// Priority: NVIDIA NVENC → Intel QSV → Apple VideoToolbox → CPU fallback
+async function detectGPUEncoder(ffmpegPath) {
+    const candidates = [
+        {
+            name: 'h264_nvenc',
+            label: 'NVIDIA NVENC (GPU)',
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+            segmentOptions: (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc:v', 'vbr', '-cq:v', String(crf), '-b:v', '0'],
+            finalOptions:   (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p7', '-rc:v', 'vbr', '-cq:v', String(crf), '-b:v', '0'],
+        },
+        {
+            name: 'h264_qsv',
+            label: 'Intel Quick Sync (GPU)',
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_qsv', '-f', 'null', '-'],
+            segmentOptions: (crf) => ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-global_quality', String(crf)],
+            finalOptions:   (crf) => ['-c:v', 'h264_qsv', '-preset', 'medium',   '-global_quality', String(crf)],
+        },
+        {
+            name: 'h264_videotoolbox',
+            label: 'Apple VideoToolbox (GPU)',
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_videotoolbox', '-f', 'null', '-'],
+            segmentOptions: (_crf) => ['-c:v', 'h264_videotoolbox', '-q:v', '65'],
+            finalOptions:   (_crf) => ['-c:v', 'h264_videotoolbox', '-q:v', '70'],
+        },
+    ];
+
+    for (const candidate of candidates) {
+        try {
+            await new Promise((resolve, reject) => {
+                const proc = exec(
+                    `"${ffmpegPath}" ${candidate.testArgs.map(a => `"${a}"`).join(' ')}`,
+                    { timeout: 8000 },
+                    (err) => (err ? reject(err) : resolve())
+                );
+                proc.on('error', reject);
+            });
+            console.log(`[GPU] Detected encoder: ${candidate.label}`);
+            return candidate;
+        } catch (_e) {
+            console.log(`[GPU] ${candidate.name} not available, trying next...`);
+        }
+    }
+
+    // CPU fallback
+    console.log('[GPU] No hardware encoder found — using CPU (libx264)');
+    return {
+        name: 'libx264',
+        label: 'CPU (libx264)',
+        segmentOptions: (crf) => ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(crf)],
+        finalOptions:   (crf) => ['-c:v', 'libx264', '-preset', 'fast',      '-crf', String(crf)],
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 let mainWindow;
 
 function createWindow() {
@@ -112,7 +175,8 @@ function createWindow() {
 // When application starts
 app.whenReady().then(async () => {
     try {
-        await setupFFmpegBinaries();
+        const { ffmpegPath } = await setupFFmpegBinaries();
+        gpuEncoderConfig = await detectGPUEncoder(ffmpegPath);
         await initializeMusicLibrary();
         createWindow();
     } catch (error) {
@@ -131,6 +195,14 @@ app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
     }
+});
+
+// Return detected encoder info to the renderer
+ipcMain.on('get-encoder-info', (event) => {
+    event.reply('encoder-info', gpuEncoderConfig
+        ? { name: gpuEncoderConfig.name, label: gpuEncoderConfig.label, isGPU: gpuEncoderConfig.name !== 'libx264' }
+        : { name: 'libx264', label: 'CPU (libx264)', isGPU: false }
+    );
 });
 
 // Input file selection
@@ -1187,22 +1259,30 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                     event.reply('log', '═══════════════════════════════════════');
                     event.reply('log', '✂️  PHASE 2: SEGMENT EXTRACTION');
                     event.reply('log', '═══════════════════════════════════════');
+                    // Dynamic batch size: GPU can handle more parallel jobs than CPU
+                    const cpuCount = os.cpus().length;
+                    const isGPU = gpuEncoderConfig.name !== 'libx264';
+                    const BATCH_SIZE = isGPU
+                        ? Math.min(8, cpuCount)                          // GPU: limited by GPU VRAM/throughput
+                        : Math.min(6, Math.max(2, Math.floor(cpuCount / 2))); // CPU: leave headroom for system
+
                     event.reply('log', `📊 Extraction plan:`);
                     event.reply('log', `   • Total segments: ${segments.length}`);
-                    event.reply('log', `   • Batch size: 4 segments (parallel)`);
+                    event.reply('log', `   • Encoder: ${gpuEncoderConfig.label}`);
+                    event.reply('log', `   • CPU cores: ${cpuCount}`);
+                    event.reply('log', `   • Batch size: ${BATCH_SIZE} segments (parallel)`);
                     event.reply('log', `   • Temp directory: ${tempDir}`);
                     event.reply('log', `   • Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
                     event.reply('log', '');
                     const segmentFiles = [];
-                    
+
                     // Prepare segment file paths
                     for (let i = 0; i < segments.length; i++) {
                         const segmentFile = path.join(tempDir, `segment_${i.toString().padStart(4, '0')}.mp4`);
                         segmentFiles.push(segmentFile);
                     }
-                    
+
                     // Process segments in parallel batches
-                    const BATCH_SIZE = 4; // Process 4 segments simultaneously
                     let processedCount = 0;
                     
                     for (let i = 0; i < segments.length; i += BATCH_SIZE) {
@@ -1299,14 +1379,14 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
             event.reply('log', `         • Normalization: DISABLED`);
         }
         
+        const segmentVideoOpts = gpuEncoderConfig.segmentOptions(20);
+        event.reply('log', `         • Encoder: ${gpuEncoderConfig.label}`);
+
         command
             .outputOptions([
                 '-ss', startTime.toString(),      // Accurate seek (after input)
                 '-t', duration.toString(),        // Duration to extract
-                // High quality encoding
-                '-c:v', 'libx264',
-                '-preset', 'ultrafast',
-                '-crf', '20',
+                ...segmentVideoOpts,
                 '-c:a', 'aac',
                 '-b:a', '192k',
                 '-ar', '48000',
@@ -1383,20 +1463,19 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
             
             // NOTE: Do NOT apply normalization here - segments are already normalized!
             event.reply('log', '');
+            const finalVideoOpts = gpuEncoderConfig.finalOptions(18);
             event.reply('log', '⚙️  Concatenation settings:');
-            event.reply('log', `   • Video codec: libx264 (fast preset, CRF 18)`);
+            event.reply('log', `   • Video encoder: ${gpuEncoderConfig.label}`);
             event.reply('log', `   • Audio codec: AAC 192k`);
             event.reply('log', `   • Normalization: Already applied to segments`);
             event.reply('log', `   • ℹ️  Concat only merges - no re-normalization`);
             event.reply('log', '   • Sync: CFR (constant frame rate)');
             event.reply('log', '');
-            
+
             command
                 .outputOptions([
                     // Re-encode with high quality to ensure compatibility
-                    '-c:v', 'libx264',
-                    '-preset', 'fast',
-                    '-crf', '18',
+                    ...finalVideoOpts,
                     '-c:a', 'aac',
                     '-b:a', '192k',
                     '-ar', '48000',
