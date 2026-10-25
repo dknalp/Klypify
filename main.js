@@ -50,6 +50,9 @@ async function setupFFmpegBinaries() {
         if (isWindows) {
             ffmpegPath = path.join(__dirname, 'bin', 'win', 'ffmpeg.exe');
             ffprobePath = path.join(__dirname, 'bin', 'win', 'ffprobe.exe');
+        } else if (process.platform === 'linux') {
+            ffmpegPath = path.join(__dirname, 'bin', 'linux', 'ffmpeg');
+            ffprobePath = path.join(__dirname, 'bin', 'linux', 'ffprobe');
         } else {
             ffmpegPath = path.join(__dirname, 'bin', 'mac', 'ffmpeg');
             ffprobePath = path.join(__dirname, 'bin', 'mac', 'ffprobe');

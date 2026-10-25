@@ -8,7 +8,8 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win32": "electron-builder --win --ia32",
-    "build:win64": "electron-builder --win --x64"
+    "build:win64": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux --x64"
   },
   "build": {
     "appId": "com.klyppr.app",
@@ -38,6 +39,14 @@
       {
         "from": "bin/win/ffprobe.exe",
         "to": "bin/ffprobe.exe"
+      },
+      {
+        "from": "bin/linux/ffmpeg",
+        "to": "bin/ffmpeg"
+      },
+      {
+        "from": "bin/linux/ffprobe",
+        "to": "bin/ffprobe"
       }
     ],
     "mac": {
@@ -55,6 +64,13 @@
     },
     "portable": {
       "artifactName": "Klyppr-Portable-${arch}.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "public/logo.png",
+      "category": "AudioVideo"
     }
   },
   "keywords": [
