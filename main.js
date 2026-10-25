@@ -51,8 +51,18 @@ async function setupFFmpegBinaries() {
             ffmpegPath = path.join(__dirname, 'bin', 'win', 'ffmpeg.exe');
             ffprobePath = path.join(__dirname, 'bin', 'win', 'ffprobe.exe');
         } else if (process.platform === 'linux') {
-            ffmpegPath = path.join(__dirname, 'bin', 'linux', 'ffmpeg');
-            ffprobePath = path.join(__dirname, 'bin', 'linux', 'ffprobe');
+            // Prefer system ffmpeg on Linux — bundled static builds lack hardware encoders (NVENC etc.)
+            const systemFfmpeg  = '/usr/bin/ffmpeg';
+            const systemFfprobe = '/usr/bin/ffprobe';
+            const bundledFfmpeg  = path.join(__dirname, 'bin', 'linux', 'ffmpeg');
+            const bundledFfprobe = path.join(__dirname, 'bin', 'linux', 'ffprobe');
+            if (fs.existsSync(systemFfmpeg) && fs.existsSync(systemFfprobe)) {
+                ffmpegPath  = systemFfmpeg;
+                ffprobePath = systemFfprobe;
+            } else {
+                ffmpegPath  = bundledFfmpeg;
+                ffprobePath = bundledFfprobe;
+            }
         } else {
             ffmpegPath = path.join(__dirname, 'bin', 'mac', 'ffmpeg');
             ffprobePath = path.join(__dirname, 'bin', 'mac', 'ffprobe');
