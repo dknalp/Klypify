@@ -837,7 +837,20 @@
             badge.title = `Active encoder: ${info.label}`;
             badge.className = `encoder-badge ${info.isGPU ? 'encoder-gpu' : 'encoder-cpu'}`;
         });
-    </script>
+    
+    // GPU warning: shown when no hardware ffmpeg is available
+    ipcRenderer.on('gpu-warning', (event, message) => {
+        let banner = document.getElementById('gpu-warning-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'gpu-warning-banner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;';
+            banner.innerHTML = '<span style="font-size:16px">⚠️</span><span id="gpu-warning-text"></span><button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;padding:2px 8px;cursor:pointer;border-radius:3px;">✕</button>';
+            document.body.prepend(banner);
+        }
+        document.getElementById('gpu-warning-text').textContent = message;
+    });
+</script>
 
     <!-- Completion Modal -->
     <div id="completionModal" class="modal">

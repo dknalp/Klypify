@@ -1,1 +1,1 @@
-npm start
+bun run start

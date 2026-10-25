@@ -2,6 +2,56 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs-extra');
 const path = require('path');
 
+const { execFile, execFileSync } = require('child_process');
+
+// Resolve encoder lazily when processVideo is first called
+let gpuEncoderConfig = null;
+let _ffmpegPath = ffmpeg.getFfmpegPath ? ffmpeg.getFfmpegPath() : path.join(__dirname, 'bin', 'ffmpeg');
+
+function hwaccelInputOptions() {
+    const name = gpuEncoderConfig && gpuEncoderConfig.name;
+    if (name === 'h264_nvenc') return ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda'];
+    if (name === 'h264_qsv')   return ['-hwaccel', 'qsv'];
+    if (name === 'h264_amf')   return ['-hwaccel', 'd3d11va'];
+    if (name === 'h264_vaapi') return ['-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi'];
+    if (name === 'h264_videotoolbox') return ['-hwaccel', 'videotoolbox'];
+    return [];
+}
+
+function probeEncoderSync(ffmpegPath, args) {
+    try {
+        execFileSync(ffmpegPath, args, { timeout: 8000, stdio: 'pipe' });
+        return true;
+    } catch (_) { return false; }
+}
+
+async function resolveEncoder() {
+    if (gpuEncoderConfig) return;
+    const frame = ['-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.2'];
+    const crf = '20';
+    const candidates = [
+        { name: 'h264_nvenc',  test: [...frame, '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+          segmentOptions: (c) => ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc:v', 'vbr', '-cq:v', String(c), '-b:v', '0', '-bf', '0'],
+          label: 'NVIDIA NVENC (GPU)' },
+        { name: 'h264_vaapi',  test: [...frame, '-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-f', 'null', '-'],
+          segmentOptions: (c) => ['-c:v', 'h264_vaapi', '-qp', String(c)], label: 'Intel VAAPI (GPU)' },
+    ];
+    for (const c of candidates) {
+        if (probeEncoderSync(ffmpegPath, c.test)) {
+            gpuEncoderConfig = c;
+            console.log(`[GPU] index.js encoder: ${c.label}`);
+            return;
+        }
+    }
+    gpuEncoderConfig = {
+        name: 'libx264', label: 'CPU (libx264)',
+        segmentOptions: (c) => ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(c)],
+    };
+    console.log('[GPU] index.js encoder: CPU fallback (libx264)');
+}
+
+
+
 // Set FFmpeg binary paths
 const ffmpegPath = path.join(__dirname, 'bin', 'ffmpeg');
 const ffprobePath = path.join(__dirname, 'bin', 'ffprobe');
@@ -126,7 +176,7 @@ async function processVideo(inputFile) {
                 .inputOptions([
                     '-y',                    // Overwrite output file
                     '-loglevel', 'verbose',  // Detailed logging
-                    '-threads', '0'          // Use all CPU cores
+ ...hwaccelInputOptions()
                 ])
                 .videoFilters([
                     `select='${selectFilter}'`,
@@ -137,22 +187,12 @@ async function processVideo(inputFile) {
                     'asetpts=N/SR/TB'
                 ])
                 .outputOptions([
-                    // Video codec and optimizations
-                    '-c:v', 'libx264',          // H.264 codec
-                    '-preset', 'ultrafast',     // Fastest encoding preset
-                    '-tune', 'fastdecode',      // Optimize for fast decoding
-                    '-profile:v', 'baseline',   // Simplest and fastest profile
-                    '-level', '3.0',           // Compatible level
-                    '-x264-params', 'ref=1:bframes=0',  // Reference frame and B-frame optimization
-                    
-                    // Audio codec
-                    '-c:a', 'aac',
-                    '-b:a', '128k',
-                    
-                    // Other optimizations
-                    '-movflags', '+faststart',
-                    '-max_muxing_queue_size', '9999',
-                    '-threads', '0'               // Use all cores for output processing
+ // Video encoder matches the GPU detected in main.js (CPU only if none exists)
+ ...gpuEncoderConfig.segmentOptions(20),
+ '-c:a', 'aac',
+ '-b:a', '192k',
+ '-movflags', '+faststart',
+ '-max_muxing_queue_size', '9999'
                 ]);
 
             // Log FFmpeg command
@@ -200,6 +240,7 @@ async function processVideo(inputFile) {
 }
 
 async function processAllVideos() {
+    await resolveEncoder();
     try {
         const videosDir = path.join(__dirname, 'videos');
         await fs.ensureDir(videosDir);

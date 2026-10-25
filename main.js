@@ -86,6 +86,7 @@ async function setupFFmpegBinaries() {
 
 // Cached encoder config — set once at startup, used by all encode calls
 let gpuEncoderConfig = null;
+let gpuWarningMessage = null;
 
 // Returns the encoder config object after probing available hardware encoders.
 // Priority: NVIDIA NVENC → Intel QSV → Apple VideoToolbox → CPU fallback
@@ -95,7 +96,7 @@ async function detectGPUEncoder(ffmpegPath) {
             name: 'h264_nvenc',
             label: 'NVIDIA NVENC (GPU)',
             testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
-            segmentOptions: (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc:v', 'vbr', '-cq:v', String(crf), '-b:v', '0'],
+            segmentOptions: (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p1', '-tune', 'll', '-rc:v', 'constqp', '-qp', String(crf), '-bf', '0'],
             finalOptions:   (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p7', '-rc:v', 'vbr', '-cq:v', String(crf), '-b:v', '0'],
         },
         {
@@ -132,6 +133,7 @@ async function detectGPUEncoder(ffmpegPath) {
     }
 
     // CPU fallback
+    gpuWarningMessage = 'No hardware encoder found. Using CPU (libx264) — encoding will be slower.';
     console.log('[GPU] No hardware encoder found — using CPU (libx264)');
     return {
         name: 'libx264',
@@ -140,6 +142,19 @@ async function detectGPUEncoder(ffmpegPath) {
         finalOptions:   (crf) => ['-c:v', 'libx264', '-preset', 'fast',      '-crf', String(crf)],
     };
 }
+
+async function probeNvencSessionCap(ffmpegPath) {
+    const MAX = 8;
+    const frame = ['-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.5',
+                   '-c:v', 'h264_nvenc', '-preset', 'p1', '-frames:v', '1', '-f', 'null', '-'];
+    const { execFile } = require('child_process');
+    const jobs = Array.from({ length: MAX }, () =>
+        new Promise(res => { execFile(ffmpegPath, frame, { timeout: 8000 }, (err) => res(!err)); })
+    );
+    const results = await Promise.all(jobs);
+    return Math.max(1, results.filter(Boolean).length);
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -177,6 +192,12 @@ app.whenReady().then(async () => {
     try {
         const { ffmpegPath } = await setupFFmpegBinaries();
         gpuEncoderConfig = await detectGPUEncoder(ffmpegPath);
+    // Cap concurrent encodes to the hardware NVENC session limit
+    if (gpuEncoderConfig && gpuEncoderConfig.name === 'h264_nvenc') {
+        const nvencCap = await probeNvencSessionCap(ffmpegPath);
+        console.log(`[GPU] NVENC session cap: ${nvencCap}`);
+        BATCH_SIZE = Math.min(BATCH_SIZE, nvencCap);
+    }
         await initializeMusicLibrary();
         createWindow();
     } catch (error) {
@@ -203,6 +224,7 @@ ipcMain.on('get-encoder-info', (event) => {
         ? { name: gpuEncoderConfig.name, label: gpuEncoderConfig.label, isGPU: gpuEncoderConfig.name !== 'libx264' }
         : { name: 'libx264', label: 'CPU (libx264)', isGPU: false }
     );
+    if (gpuWarningMessage) event.reply('gpu-warning', gpuWarningMessage);
 });
 
 // Input file selection
@@ -1356,6 +1378,79 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
 }
 
 // Extract a single segment with exact timing
+// ─────────────────────────────────────────────────────────────────────────────
+// Single-pass pipeline: ffmpeg select filter cuts all silence in one decode.
+// ~2x faster than multi-pass extract+concat; no temp files; one process spawn.
+// ─────────────────────────────────────────────────────────────────────────────
+function processVideoFast(inputFile, outputFile, segments, params, event) {
+    return new Promise((resolve, reject) => {
+        const selectParts = segments.map(s => 'between(t,' + s.start + ',' + s.end + ')');
+        const selectExpr = selectParts.join('+');
+
+        event.reply('log', '');
+        event.reply('log', '⚡ SINGLE-PASS: select filter (no temp files)');
+        event.reply('log', '   Segments: ' + segments.length + ' | one ffmpeg call');
+        event.reply('log', '');
+
+        const hw = hwaccelInputOptions();
+        let cudaFailed = false;
+        const command = ffmpeg(inputFile);
+        if (hw.length) command.inputOptions(hw);
+
+        const vFilter = ["select='" + selectExpr + "'", 'setpts=N/FRAME_RATE/TB'];
+        const aFilter = ["aselect='" + selectExpr + "'", 'asetpts=N/SR/TB'];
+        if (params.normalizeAudio) aFilter.push('loudnorm=I=-16:TP=-1.5:LRA=11');
+
+        command
+            .videoFilters(vFilter)
+            .audioFilters(aFilter)
+            .outputOptions([
+                ...gpuEncoderConfig.segmentOptions(20),
+                '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+                '-movflags', '+faststart', '-max_muxing_queue_size', '9999'
+            ])
+            .on('start', () => { event.reply('log', '▶️  FFmpeg single-pass started'); })
+            .on('stderr', line => {
+                if (line.includes('Failed setup for format cuda') ||
+                    line.includes('Hardware is lacking required capabilities')) {
+                    cudaFailed = true;
+                }
+            })
+            .on('progress', progress => {
+                if (progress.percent) {
+                    event.reply('progress', {
+                        status: 'Processing: ' + progress.percent.toFixed(1) + '%',
+                        percent: Math.round(25 + Math.min(70, progress.percent * 0.70))
+                    });
+                }
+            })
+            .on('end', () => {
+                if (hw.length) {
+                    event.reply('log', '   Decode: ' + (cudaFailed ? 'CPU (CUDA soft-fail)' : 'GPU (' + hw[1] + ')'));
+                }
+                event.reply('log', '   Encode: ' + gpuEncoderConfig.label);
+                event.reply('log', '✅ Single-pass complete');
+                resolve();
+            })
+            .on('error', (err) => {
+                if (hw.length && !cudaFailed) {
+                    event.reply('log', '   ⚠️ GPU decode failed, retrying CPU: ' + err.message);
+                    const cmd2 = ffmpeg(inputFile)
+                        .videoFilters(vFilter).audioFilters(aFilter)
+                        .outputOptions([
+                            ...gpuEncoderConfig.segmentOptions(20),
+                            '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+                            '-movflags', '+faststart', '-max_muxing_queue_size', '9999'
+                        ]);
+                    cmd2.on('end', resolve).on('error', reject).save(outputFile);
+                    return;
+                }
+                reject(err);
+            })
+            .save(outputFile);
+    });
+}
+
 function extractSegment(inputFile, outputFile, startTime, endTime, params, event) {
     return new Promise((resolve, reject) => {
         const duration = endTime - startTime;
@@ -1367,6 +1462,7 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
         event.reply('log', `         • Output: ${path.basename(outputFile)}`);
         
         // Use accurate seeking: -ss after -i for precise cuts
+        let cudaDecodeFailed = false;
         const command = ffmpeg(inputFile);
         
         // Audio filter - apply loudness normalization if enabled
@@ -1481,7 +1577,7 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                     '-ar', '48000',
                     '-ac', '2',
                     // Ensure proper sync
-                    '-vsync', 'cfr',
+                    '-fps_mode', 'cfr',
                     '-async', '1',
                     '-max_muxing_queue_size', '9999',
                     '-movflags', '+faststart'
@@ -1491,6 +1587,7 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                     event.reply('log', `   Input: ${segmentFiles.length} segment files`);
                     event.reply('log', `   Output: ${path.basename(outputFile)}`);
                     event.reply('log', '');
+                    event.reply('progress', { status: 'Concatenating segments...', percent: 75 });
                 })
                 .on('progress', (progress) => {
                     if (progress.percent) {
