@@ -100,29 +100,40 @@ async function setupFFmpegBinaries() {
 // Cached encoder config — set once at startup, used by all encode calls
 let gpuEncoderConfig = null;
 let gpuWarningMessage = null;
+let BATCH_SIZE = 4; // max parallel segment encodes; capped to NVENC session limit at startup
 
 // Returns the encoder config object after probing available hardware encoders.
 // Priority: NVIDIA NVENC → Intel QSV → Apple VideoToolbox → CPU fallback
 async function detectGPUEncoder(ffmpegPath) {
+    // NOTE: Ada Lovelace (RTX 4060/4070/4080/4090) requires minimum 146x146 for NVENC H.264.
+    // 64x64 caused silent failure on these GPUs. 256x256 is safe across all generations.
     const candidates = [
         {
             name: 'h264_nvenc',
             label: 'NVIDIA NVENC (GPU)',
-            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.1', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
             segmentOptions: (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p1', '-tune', 'll', '-rc:v', 'constqp', '-qp', String(crf), '-bf', '0'],
             finalOptions:   (crf) => ['-c:v', 'h264_nvenc', '-preset', 'p7', '-rc:v', 'vbr', '-cq:v', String(crf), '-b:v', '0'],
         },
         {
             name: 'h264_qsv',
             label: 'Intel Quick Sync (GPU)',
-            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_qsv', '-f', 'null', '-'],
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.1', '-c:v', 'h264_qsv', '-f', 'null', '-'],
             segmentOptions: (crf) => ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-global_quality', String(crf)],
             finalOptions:   (crf) => ['-c:v', 'h264_qsv', '-preset', 'medium',   '-global_quality', String(crf)],
         },
         {
+            name: 'h264_vaapi',
+            label: 'VAAPI (GPU)',
+            testArgs: ['-vaapi_device', '/dev/dri/renderD128', '-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.1',
+                       '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-f', 'null', '-'],
+            segmentOptions: (_crf) => ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', '20'],
+            finalOptions:   (_crf) => ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', '22'],
+        },
+        {
             name: 'h264_videotoolbox',
             label: 'Apple VideoToolbox (GPU)',
-            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=64x64:d=0.1', '-c:v', 'h264_videotoolbox', '-f', 'null', '-'],
+            testArgs: ['-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.1', '-c:v', 'h264_videotoolbox', '-f', 'null', '-'],
             segmentOptions: (_crf) => ['-c:v', 'h264_videotoolbox', '-q:v', '65'],
             finalOptions:   (_crf) => ['-c:v', 'h264_videotoolbox', '-q:v', '70'],
         },
@@ -140,8 +151,8 @@ async function detectGPUEncoder(ffmpegPath) {
             });
             console.log(`[GPU] Detected encoder: ${candidate.label}`);
             return candidate;
-        } catch (_e) {
-            console.log(`[GPU] ${candidate.name} not available, trying next...`);
+        } catch (e) {
+            console.log(`[GPU] ${candidate.name} not available: ${e.message.split('\n')[0]}`);
         }
     }
 
