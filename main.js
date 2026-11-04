@@ -73,8 +73,21 @@ async function setupFFmpegBinaries() {
             ffmpegPath = path.join(process.resourcesPath, 'bin', 'ffmpeg.exe');
             ffprobePath = path.join(process.resourcesPath, 'bin', 'ffprobe.exe');
         } else {
-            ffmpegPath = path.join(process.resourcesPath, 'bin', 'ffmpeg');
-            ffprobePath = path.join(process.resourcesPath, 'bin', 'ffprobe');
+            const bundledFfmpeg  = path.join(process.resourcesPath, 'bin', 'ffmpeg');
+            const bundledFfprobe = path.join(process.resourcesPath, 'bin', 'ffprobe');
+            const systemFfmpeg   = '/usr/bin/ffmpeg';
+            const systemFfprobe  = '/usr/bin/ffprobe';
+            // Prefer bundled; fall back to system when running outside a packaged app
+            if (fs.existsSync(bundledFfmpeg)) {
+                ffmpegPath  = bundledFfmpeg;
+                ffprobePath = bundledFfprobe;
+            } else if (fs.existsSync(systemFfmpeg)) {
+                ffmpegPath  = systemFfmpeg;
+                ffprobePath = systemFfprobe;
+            } else {
+                ffmpegPath  = bundledFfmpeg; // let the missing-binary dialog trigger
+                ffprobePath = bundledFfprobe;
+            }
         }
     }
 
