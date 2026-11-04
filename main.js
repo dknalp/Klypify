@@ -345,7 +345,9 @@ ipcMain.on('start-processing', async (event, params) => {
             percent: 0
         });
 
+        const _t0 = Date.now();
         const silenceRanges = await detectSilence(params.inputPath, params, event);
+        event.reply('log', `⏱️  Phase 1 done in ${((Date.now()-_t0)/1000).toFixed(2)}s`);
 
         if (silenceRanges.length === 0) {
             event.reply('log', 'No silence found');
@@ -394,8 +396,22 @@ ipcMain.on('start-processing', async (event, params) => {
             `.temp_processed_${path.basename(params.inputPath)}`
         );
         
-        await processVideo(params.inputPath, tempProcessedFile, silenceRanges, params, event);
+        const _t1 = Date.now();
+        // Single-pass select filter (one encode). Falls back to per-segment
+ // extraction if the filter graph fails (e.g. huge segment counts).
+ try {
+ const totalDuration = await getVideoDuration(params.inputPath);
+ const segments = calculateNonSilentSegments(silenceRanges, totalDuration, event);
+ if (segments.length === 0) {
+ throw new Error('No non-silent segments calculated');
+ }
+ await processVideoFast(params.inputPath, tempProcessedFile, segments, params, event);
+ } catch (fastErr) {
+ event.reply('log', ' Single-pass failed, falling back to per-segment processing: ' + fastErr.message);
+ await processVideo(params.inputPath, tempProcessedFile, silenceRanges, params, event);
+ }
         
+        event.reply('log', `⏱️  Phase 2 done in ${((Date.now()-_t1)/1000).toFixed(2)}s`);
         // Phase 3: Add background music (if enabled)
         event.reply('progress', {
             status: 'Phase 3: Adding background music...',
@@ -1054,6 +1070,7 @@ async function detectSilence(inputFile, params, event) {
 
             // Proceed with silence detection
             let analysisProgress = 0;
+            const totalDurationSec = metadata.format.duration || 0;
             ffmpeg(inputFile)
                 .outputOptions(['-f', 'null'])
                 .audioFilters(`silencedetect=noise=${params.silenceDb}dB:d=${params.minSilenceDuration}`)
@@ -1066,9 +1083,17 @@ async function detectSilence(inputFile, params, event) {
                 .on('stderr', line => {
                     // Log progress
                     if (line.includes('time=')) {
-                        const timeMatch = line.match(/time=([\d:]+)/);
+                        const timeMatch = line.match(/time=([\d:.]+)/);
                         if (timeMatch && analysisProgress++ % 10 === 0) {
                             event.reply('log', `   ⏱️  Processing: ${timeMatch[1]}`);
+                         const parts = timeMatch[1].split(':').map(Number);
+                         const secs = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : 0;
+                         if (totalDurationSec > 0 && secs > 0) {
+                         event.reply('progress', {
+                         status: 'Phase 1: Analyzing audio for silence...',
+                         percent: Math.min(99, (secs / totalDurationSec) * 100)
+                         });
+                         }
                         }
                     }
 
@@ -1395,14 +1420,26 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
 // Single-pass pipeline: ffmpeg select filter cuts all silence in one decode.
 // ~2x faster than multi-pass extract+concat; no temp files; one process spawn.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Hardware-decode input options ─────────────────────────────────────────
+// Returns FFmpeg input flags for GPU-accelerated decode when NVENC is active.
+// Keeps processVideoFast in sync with the encoder selection.
+function hwaccelInputOptions() {
+    if (gpuEncoderConfig && gpuEncoderConfig.name === 'h264_nvenc') {
+        return ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda'];
+    }
+    return [];
+}
+
 function processVideoFast(inputFile, outputFile, segments, params, event) {
     return new Promise((resolve, reject) => {
         const selectParts = segments.map(s => 'between(t,' + s.start + ',' + s.end + ')');
         const selectExpr = selectParts.join('+');
 
+        const _pvfStart = Date.now();
         event.reply('log', '');
         event.reply('log', '⚡ SINGLE-PASS: select filter (no temp files)');
-        event.reply('log', '   Segments: ' + segments.length + ' | one ffmpeg call');
+        event.reply('log', `   Segments: ${segments.length} | one ffmpeg call | encoder: ${gpuEncoderConfig.label}`);
         event.reply('log', '');
 
         const hw = hwaccelInputOptions();
@@ -1422,7 +1459,10 @@ function processVideoFast(inputFile, outputFile, segments, params, event) {
                 '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
                 '-movflags', '+faststart', '-max_muxing_queue_size', '9999'
             ])
-            .on('start', () => { event.reply('log', '▶️  FFmpeg single-pass started'); })
+            .on('start', (cmd) => {
+                event.reply('log', '▶️  FFmpeg single-pass started');
+                event.reply('log', '   CMD: ' + cmd.slice(0, 300));
+            })
             .on('stderr', line => {
                 if (line.includes('Failed setup for format cuda') ||
                     line.includes('Hardware is lacking required capabilities')) {
@@ -1441,8 +1481,8 @@ function processVideoFast(inputFile, outputFile, segments, params, event) {
                 if (hw.length) {
                     event.reply('log', '   Decode: ' + (cudaFailed ? 'CPU (CUDA soft-fail)' : 'GPU (' + hw[1] + ')'));
                 }
-                event.reply('log', '   Encode: ' + gpuEncoderConfig.label);
-                event.reply('log', '✅ Single-pass complete');
+                event.reply('log', `   Encode: ${gpuEncoderConfig.label}`);
+                event.reply('log', `✅ Single-pass complete in ${((Date.now()-_pvfStart)/1000).toFixed(2)}s`);
                 resolve();
             })
             .on('error', (err) => {
@@ -1507,10 +1547,8 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
             .on('start', (cmd) => {
                 event.reply('log', `         • FFmpeg started`);
             })
-            .on('progress', (progress) => {
-                if (progress.percent) {
-                    event.reply('log', `         • Progress: ${progress.percent.toFixed(1)}%`);
-                }
+            .on('progress', () => {
+                // No per-frame log — avoids IPC spam on long segments
             })
             .on('error', (err) => {
                 event.reply('log', `         ❌ ERROR: ${err.message}`);
@@ -1583,17 +1621,11 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
 
             command
                 .outputOptions([
-                    // Re-encode with high quality to ensure compatibility
-                    ...finalVideoOpts,
-                    '-c:a', 'aac',
-                    '-b:a', '192k',
-                    '-ar', '48000',
-                    '-ac', '2',
-                    // Ensure proper sync
-                    '-fps_mode', 'cfr',
-                    '-async', '1',
-                    '-max_muxing_queue_size', '9999',
-                    '-movflags', '+faststart'
+                    // Stream copy: segments are already encoded — no re-encode needed
+                    // This is 10-50x faster than re-encoding for concat
+                    '-c', 'copy',
+                    '-movflags', '+faststart',
+                    '-max_muxing_queue_size', '9999'
                 ])
                 .on('start', (cmd) => {
                     event.reply('log', '▶️  FFmpeg concatenation started');
