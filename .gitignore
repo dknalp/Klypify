@@ -6,3 +6,6 @@ dist
 .concat_list.txt
 temp_ffmpeg
 bin/win/*.exe
+# Environment files
+.env
+.env.*
