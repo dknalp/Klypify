@@ -412,6 +412,7 @@
 
             // Progress bar'ı sıfırla
             document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressBar').classList.add('active');
             
             // Log'u temizle ve kapat
             document.getElementById('log').innerHTML = '';
@@ -433,9 +434,14 @@
             updateStartButton();
         });
 
+        let _lastPercent = -1;
         ipcRenderer.on('progress', (event, data) => {
             document.getElementById('status').textContent = data.status;
-            document.getElementById('progressBar').style.width = `${data.percent}%`;
+            const pct = Math.round(data.percent);
+            if (pct !== _lastPercent) {
+                document.getElementById('progressBar').style.width = `${pct}%`;
+                _lastPercent = pct;
+            }
         });
 
         ipcRenderer.on('log', (event, message) => {
@@ -454,6 +460,7 @@
                 
                 // Complete progress bar to 100%
                 document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('progressBar').classList.remove('active');
                 
                 // Auto-open the output folder so the user immediately sees their file
                 ipcRenderer.send('show-in-folder', result.outputFile);

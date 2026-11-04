@@ -327,9 +327,9 @@ ipcMain.on('start-processing', async (event, params) => {
         // Check if autocut is enabled
         if (!params.autoCutSilence) {
             // Only normalize audio if enabled, otherwise just copy
-            event.reply('log', '⚠️ Auto-Cut Silence: DISABLED');
-            event.reply('log', `🎚️  Audio Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
-            event.reply('log', '');
+            console.log('⚠️ Auto-Cut Silence: DISABLED');
+            console.log(`🎚️  Audio Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
+            console.log('');
             
             const tempProcessedFile = path.join(
                 params.outputPath,
@@ -341,14 +341,14 @@ ipcMain.on('start-processing', async (event, params) => {
                     status: 'Normalizing audio (no silence cutting)...',
                     percent: 0
                 });
-                event.reply('log', '🎚️ Applying audio normalization without silence removal...');
+                console.log('🎚️ Applying audio normalization without silence removal...');
                 await normalizeAudioOnly(params.inputPath, tempProcessedFile, params, event);
             } else {
                 event.reply('progress', {
                     status: 'Preparing video...',
                     percent: 50
                 });
-                event.reply('log', '📋 No auto-cut - preparing for background music...');
+                console.log('📋 No auto-cut - preparing for background music...');
                 await fs.copyFile(params.inputPath, tempProcessedFile);
             }
             
@@ -367,9 +367,9 @@ ipcMain.on('start-processing', async (event, params) => {
         }
         
         // Auto-cut is enabled
-        event.reply('log', '✂️  Auto-Cut Silence: ENABLED');
-        event.reply('log', `🎚️  Audio Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
-        event.reply('log', '');
+        console.log('✂️  Auto-Cut Silence: ENABLED');
+        console.log(`🎚️  Audio Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
+        console.log('');
 
         // Phase 1: Detect silences with progress
         event.reply('progress', {
@@ -635,21 +635,21 @@ function getVideoDuration(videoPath) {
 async function prepareMusicPlaylist(musicSettings, videoDuration, event) {
     const library = loadMusicLibrary();
     
-    event.reply('log', `📀 Preparing music playlist (${musicSettings.mode} mode)`);
-    event.reply('log', `   Video duration: ${videoDuration.toFixed(2)}s`);
-    event.reply('log', `   Looking for music IDs: [${musicSettings.selectedMusicIds.join(', ')}]`);
-    event.reply('log', `   Available music in library: ${library.musics.length}`);
+    console.log(`📀 Preparing music playlist (${musicSettings.mode} mode)`);
+    console.log(`   Video duration: ${videoDuration.toFixed(2)}s`);
+    console.log(`   Looking for music IDs: [${musicSettings.selectedMusicIds.join(', ')}]`);
+    console.log(`   Available music in library: ${library.musics.length}`);
     
     // Log all available music
     library.musics.forEach(m => {
-        event.reply('log', `      - ${m.id}: ${m.name} (${m.source})`);
+        console.log(`      - ${m.id}: ${m.name} (${m.source})`);
     });
     
     const selectedMusics = library.musics.filter(m => 
         musicSettings.selectedMusicIds.includes(m.id)
     );
     
-    event.reply('log', `   Matched ${selectedMusics.length} music(s)`);
+    console.log(`   Matched ${selectedMusics.length} music(s)`);
     
     if (selectedMusics.length === 0) {
         event.reply('log', '   ❌ ERROR: No music matched the selected IDs!');
@@ -662,8 +662,8 @@ async function prepareMusicPlaylist(musicSettings, videoDuration, event) {
             ? path.join(defaultMusicDir, m.filename)
             : path.join(userMusicDir, m.filename);
         
-        event.reply('log', `   Checking: ${m.name}`);
-        event.reply('log', `      Path: ${filePath}`);
+        console.log(`   Checking: ${m.name}`);
+        console.log(`      Path: ${filePath}`);
         
         // Check if file exists
         if (!fs.existsSync(filePath)) {
@@ -671,14 +671,14 @@ async function prepareMusicPlaylist(musicSettings, videoDuration, event) {
             throw new Error(`Music file not found: ${m.name} at ${filePath}`);
         }
         
-        event.reply('log', `      ✓ File exists`);
+        console.log(`      ✓ File exists`);
         return { ...m, filePath };
     });
     
     if (musicSettings.mode === 'loop') {
         // Loop single music
         const music = musicPaths[0];
-        event.reply('log', `   🔁 Looping: ${music.name}`);
+        console.log(`   🔁 Looping: ${music.name}`);
         return {
             mode: 'loop',
             musicPath: music.filePath,
@@ -686,9 +686,9 @@ async function prepareMusicPlaylist(musicSettings, videoDuration, event) {
         };
     } else {
         // Sequence mode - calculate crossfade
-        event.reply('log', `   ▶️  Playing sequence of ${musicPaths.length} tracks`);
+        console.log(`   ▶️  Playing sequence of ${musicPaths.length} tracks`);
         musicPaths.forEach((m, i) => {
-            event.reply('log', `      ${i + 1}. ${m.name} (${m.duration.toFixed(2)}s)`);
+            console.log(`      ${i + 1}. ${m.name} (${m.duration.toFixed(2)}s)`);
         });
         
         return {
@@ -712,7 +712,7 @@ async function createMusicInput(playlist, tempDir, event) {
         const concatFile = path.join(tempDir, 'music_concat.txt');
         const outputMusic = path.join(tempDir, 'background_music.mp3');
         
-        event.reply('log', '🎵 Creating music sequence with crossfade...');
+        console.log('🎵 Creating music sequence with crossfade...');
         
         // Build FFmpeg filter for crossfade
         const musicPaths = playlist.musicPaths;
@@ -758,11 +758,11 @@ async function createMusicInput(playlist, tempDir, event) {
                 .complexFilter(filterComplex, finalLabel)
                 .outputOptions(['-ac', '2', '-ar', '48000'])
                 .on('start', (cmd) => {
-                    event.reply('log', '   Merging music tracks with crossfade...');
+                    console.log('   Merging music tracks with crossfade...');
                 })
                 .on('stderr', (line) => {
                     if (line.includes('Error') || line.includes('Invalid')) {
-                        event.reply('log', `   FFmpeg: ${line}`);
+                        console.log(`   FFmpeg: ${line}`);
                     }
                 })
                 .on('error', (err) => {
@@ -770,7 +770,7 @@ async function createMusicInput(playlist, tempDir, event) {
                     reject(err);
                 })
                 .on('end', () => {
-                    event.reply('log', '   ✓ Music sequence created');
+                    console.log('   ✓ Music sequence created');
                     resolve({
                         type: 'sequence',
                         inputPath: outputMusic
@@ -783,16 +783,16 @@ async function createMusicInput(playlist, tempDir, event) {
 
 // Add background music to processed video
 async function addBackgroundMusic(processedVideoPath, outputPath, event, params) {
-    event.reply('log', '');
-    event.reply('log', '========================================');
-    event.reply('log', '🎵 BACKGROUND MUSIC PROCESSING');
-    event.reply('log', '========================================');
+    console.log('');
+    console.log('========================================');
+    console.log('🎵 BACKGROUND MUSIC PROCESSING');
+    console.log('========================================');
     
     const musicLibrary = loadMusicLibrary();
     const musicSettings = musicLibrary.settings;
     
     // Debug log
-    event.reply('log', `📊 Music Settings:
+    console.log(`📊 Music Settings:
    - Enabled (from params): ${params.backgroundMusicEnabled}
    - Mode: ${musicSettings.mode}
    - Selected Music IDs: [${musicSettings.selectedMusicIds.join(', ')}]
@@ -801,22 +801,22 @@ async function addBackgroundMusic(processedVideoPath, outputPath, event, params)
     
     // Check if music is enabled (from params)
     if (!params.backgroundMusicEnabled) {
-        event.reply('log', '⚠️  Background Music: DISABLED (by user in UI)');
-        event.reply('log', '   → Copying processed video without music...');
+        console.log('⚠️  Background Music: DISABLED (by user in UI)');
+        console.log('   → Copying processed video without music...');
         await fs.copy(processedVideoPath, outputPath);
         return;
     }
     
     // Check if music is selected
     if (!musicSettings.selectedMusicIds || musicSettings.selectedMusicIds.length === 0) {
-        event.reply('log', '⚠️  Background Music: ENABLED but NO music selected!');
-        event.reply('log', '   → Skipping background music...');
+        console.log('⚠️  Background Music: ENABLED but NO music selected!');
+        console.log('   → Skipping background music...');
         await fs.copy(processedVideoPath, outputPath);
         return;
     }
     
-    event.reply('log', '✅ Background Music: READY TO PROCESS');
-    event.reply('log', `   Selected ${musicSettings.selectedMusicIds.length} music(s) in ${musicSettings.mode} mode`);
+    console.log('✅ Background Music: READY TO PROCESS');
+    console.log(`   Selected ${musicSettings.selectedMusicIds.length} music(s) in ${musicSettings.mode} mode`);
     event.reply('progress', {
         status: 'Adding background music...',
         percent: 0
@@ -837,17 +837,17 @@ async function addBackgroundMusic(processedVideoPath, outputPath, event, params)
             // Create music input
             const musicInput = await createMusicInput(playlist, tempDir, event);
             
-            event.reply('log', '');
-            event.reply('log', '═══════════════════════════════════════');
-            event.reply('log', '🎬 MIXING VIDEO WITH MUSIC');
-            event.reply('log', '═══════════════════════════════════════');
-            event.reply('log', `📊 Mix settings:`);
-            event.reply('log', `   • Music type: ${musicInput.type}`);
-            event.reply('log', `   • Music path: ${musicInput.inputPath}`);
-            event.reply('log', `   • Video duration: ${videoDuration.toFixed(2)}s`);
-            event.reply('log', `   • Music volume: ${musicSettings.volume} dB`);
-            event.reply('log', `   • Fade out: Last 3 seconds`);
-            event.reply('log', '');
+            console.log('');
+            console.log('═══════════════════════════════════════');
+            console.log('🎬 MIXING VIDEO WITH MUSIC');
+            console.log('═══════════════════════════════════════');
+            console.log(`📊 Mix settings:`);
+            console.log(`   • Music type: ${musicInput.type}`);
+            console.log(`   • Music path: ${musicInput.inputPath}`);
+            console.log(`   • Video duration: ${videoDuration.toFixed(2)}s`);
+            console.log(`   • Music volume: ${musicSettings.volume} dB`);
+            console.log(`   • Fade out: Last 3 seconds`);
+            console.log('');
             
             // Mix video and music
             await mixVideoWithMusic(
@@ -859,20 +859,20 @@ async function addBackgroundMusic(processedVideoPath, outputPath, event, params)
                 event
             );
             
-            event.reply('log', '');
-            event.reply('log', '✅ BACKGROUND MUSIC ADDED SUCCESSFULLY!');
-            event.reply('log', '═══════════════════════════════════════');
+            console.log('');
+            console.log('✅ BACKGROUND MUSIC ADDED SUCCESSFULLY!');
+            console.log('═══════════════════════════════════════');
         } finally {
             // Cleanup temp directory
             await fs.remove(tempDir).catch(() => {});
         }
     } catch (error) {
         event.reply('log', `❌ Error adding background music: ${error.message}`);
-        event.reply('log', `   Stack: ${error.stack}`);
+        console.log(`   Stack: ${error.stack}`);
         // If music fails, copy the processed video
         try {
             await fs.copy(processedVideoPath, outputPath);
-            event.reply('log', '   Copied video without music (fallback)');
+            console.log('   Copied video without music (fallback)');
         } catch (copyError) {
             event.reply('log', `   ❌ Failed to copy video: ${copyError.message}`);
             throw copyError;
@@ -891,7 +891,7 @@ function mixVideoWithMusic(videoPath, musicInput, outputPath, videoDuration, vol
             }
             
             const hasAudioStream = metadata.streams.some(s => s.codec_type === 'audio');
-            event.reply('log', `   Video has audio stream: ${hasAudioStream ? 'YES' : 'NO'}`);
+            console.log(`   Video has audio stream: ${hasAudioStream ? 'YES' : 'NO'}`);
             
             const command = ffmpeg();
             
@@ -938,7 +938,7 @@ function mixVideoWithMusic(videoPath, musicInput, outputPath, videoDuration, vol
                     ]);
             } else {
                 // Video has no audio, just use background music
-                event.reply('log', '   ⚠️  Video has no audio stream, using only background music');
+                console.log('   ⚠️  Video has no audio stream, using only background music');
                 
                 command
                     .complexFilter(filterComplex)
@@ -956,8 +956,8 @@ function mixVideoWithMusic(videoPath, musicInput, outputPath, videoDuration, vol
             
             command
                 .on('start', (cmd) => {
-                    event.reply('log', '   ▶️  Starting FFmpeg...');
-                    event.reply('log', `   Command: ${cmd.substring(0, 300)}...`);
+                    console.log('   ▶️  Starting FFmpeg...');
+                    console.log(`   Command: ${cmd.substring(0, 300)}...`);
                 })
                 .on('progress', (progress) => {
                     if (progress.percent) {
@@ -970,18 +970,18 @@ function mixVideoWithMusic(videoPath, musicInput, outputPath, videoDuration, vol
                 .on('stderr', (line) => {
                     // Log important errors only
                     if (line.includes('Error') || line.includes('Invalid') || line.includes('does not exist')) {
-                        event.reply('log', `   FFmpeg stderr: ${line}`);
+                        console.log(`   FFmpeg stderr: ${line}`);
                     }
                 })
                 .on('error', (err) => {
                     event.reply('log', `   ❌ FFmpeg error: ${err.message}`);
-                    event.reply('log', `   Video: ${videoPath}`);
-                    event.reply('log', `   Music: ${musicInput.inputPath}`);
-                    event.reply('log', `   Output: ${outputPath}`);
+                    console.log(`   Video: ${videoPath}`);
+                    console.log(`   Music: ${musicInput.inputPath}`);
+                    console.log(`   Output: ${outputPath}`);
                     reject(err);
                 })
                 .on('end', () => {
-                    event.reply('log', '   ✓ Mixing complete');
+                    console.log('   ✓ Mixing complete');
                     resolve();
                 })
                 .save(outputPath);
@@ -992,20 +992,20 @@ function mixVideoWithMusic(videoPath, musicInput, outputPath, videoDuration, vol
 // Normalize audio only (no silence cutting)
 function normalizeAudioOnly(inputFile, outputFile, params, event) {
     return new Promise((resolve, reject) => {
-        event.reply('log', '');
-        event.reply('log', '═══════════════════════════════════════');
-        event.reply('log', '🎚️  AUDIO NORMALIZATION');
-        event.reply('log', '═══════════════════════════════════════');
-        event.reply('log', `📁 Input: ${inputFile}`);
-        event.reply('log', `📁 Output: ${outputFile}`);
-        event.reply('log', '');
-        event.reply('log', '⚙️  Normalization settings:');
-        event.reply('log', `   • Target loudness: -16 LUFS (YouTube standard)`);
-        event.reply('log', `   • True Peak: -1.5 dB`);
-        event.reply('log', `   • Loudness Range: 11 LU`);
-        event.reply('log', `   • Video codec: COPY (no re-encoding)`);
-        event.reply('log', `   • Audio codec: AAC 192k`);
-        event.reply('log', '');
+        console.log('');
+        console.log('═══════════════════════════════════════');
+        console.log('🎚️  AUDIO NORMALIZATION');
+        console.log('═══════════════════════════════════════');
+        console.log(`📁 Input: ${inputFile}`);
+        console.log(`📁 Output: ${outputFile}`);
+        console.log('');
+        console.log('⚙️  Normalization settings:');
+        console.log(`   • Target loudness: -16 LUFS (YouTube standard)`);
+        console.log(`   • True Peak: -1.5 dB`);
+        console.log(`   • Loudness Range: 11 LU`);
+        console.log(`   • Video codec: COPY (no re-encoding)`);
+        console.log(`   • Audio codec: AAC 192k`);
+        console.log('');
         
         const command = ffmpeg(inputFile)
             .audioFilters([
@@ -1020,13 +1020,13 @@ function normalizeAudioOnly(inputFile, outputFile, params, event) {
                 '-movflags', '+faststart'
             ])
             .on('start', (cmd) => {
-                event.reply('log', '▶️  FFmpeg processing started');
-                event.reply('log', `   Command: ${cmd.substring(0, 150)}...`);
-                event.reply('log', '');
+                console.log('▶️  FFmpeg processing started');
+                console.log(`   Command: ${cmd.substring(0, 150)}...`);
+                console.log('');
             })
             .on('progress', (progress) => {
                 if (progress.percent) {
-                    event.reply('log', `   ⏱️  Progress: ${progress.percent.toFixed(1)}%`);
+                    console.log(`   ⏱️  Progress: ${progress.percent.toFixed(1)}%`);
                     event.reply('progress', {
                         status: `Normalizing: ${progress.percent.toFixed(1)}%`,
                         percent: progress.percent
@@ -1034,15 +1034,15 @@ function normalizeAudioOnly(inputFile, outputFile, params, event) {
                 }
             })
             .on('error', (err) => {
-                event.reply('log', '');
+                console.log('');
                 event.reply('log', `❌ ERROR: ${err.message}`);
-                event.reply('log', '═══════════════════════════════════════');
+                console.log('═══════════════════════════════════════');
                 reject(err);
             })
             .on('end', () => {
-                event.reply('log', '');
-                event.reply('log', '✅ NORMALIZATION COMPLETE');
-                event.reply('log', '═══════════════════════════════════════');
+                console.log('');
+                console.log('✅ NORMALIZATION COMPLETE');
+                console.log('═══════════════════════════════════════');
                 event.reply('progress', {
                     status: 'Complete!',
                     percent: 100
@@ -1059,46 +1059,46 @@ async function detectSilence(inputFile, params, event) {
         let startTime = null;
         let hasAudioStream = false;
 
-        event.reply('log', '');
-        event.reply('log', '═══════════════════════════════════════');
+        console.log('');
+        console.log('═══════════════════════════════════════');
         event.reply('log', '🔍 PHASE 1: SILENCE DETECTION');
-        event.reply('log', '═══════════════════════════════════════');
-        event.reply('log', `📁 Input file: ${inputFile}`);
-        event.reply('log', `⚙️  Parameters:`);
-        event.reply('log', `   • Threshold: ${params.silenceDb} dB`);
-        event.reply('log', `   • Min Duration: ${params.minSilenceDuration}s`);
-        event.reply('log', `   • Padding: ${params.paddingDuration}s`);
-        event.reply('log', '');
+        console.log('═══════════════════════════════════════');
+        console.log(`📁 Input file: ${inputFile}`);
+        console.log(`⚙️  Parameters:`);
+        console.log(`   • Threshold: ${params.silenceDb} dB`);
+        console.log(`   • Min Duration: ${params.minSilenceDuration}s`);
+        console.log(`   • Padding: ${params.paddingDuration}s`);
+        console.log('');
 
         // First check if video has audio stream
         ffmpeg.ffprobe(inputFile, (probeErr, metadata) => {
             if (probeErr) {
                 event.reply('log', `❌ ERROR: Could not probe file`);
-                event.reply('log', `   ${probeErr.message}`);
+                console.log(`   ${probeErr.message}`);
                 return reject(probeErr);
             }
 
             hasAudioStream = metadata.streams.some(s => s.codec_type === 'audio');
-            event.reply('log', `📊 Video Analysis:`);
-            event.reply('log', `   • Has audio stream: ${hasAudioStream ? 'YES' : 'NO'}`);
+            console.log(`📊 Video Analysis:`);
+            console.log(`   • Has audio stream: ${hasAudioStream ? 'YES' : 'NO'}`);
             
             if (!hasAudioStream) {
-                event.reply('log', '');
-                event.reply('log', '⚠️  WARNING: No audio stream found');
-                event.reply('log', '   → Skipping silence detection');
-                event.reply('log', '═══════════════════════════════════════');
+                console.log('');
+                console.log('⚠️  WARNING: No audio stream found');
+                console.log('   → Skipping silence detection');
+                console.log('═══════════════════════════════════════');
                 return resolve([]);
             }
 
             const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
-            event.reply('log', `   • Audio codec: ${audioStream.codec_name}`);
-            event.reply('log', `   • Sample rate: ${audioStream.sample_rate}Hz`);
-            event.reply('log', `   • Channels: ${audioStream.channels}`);
-            event.reply('log', `   • Duration: ${metadata.format.duration.toFixed(2)}s`);
-            event.reply('log', '');
-            event.reply('log', '🔎 Starting audio analysis...');
-            event.reply('log', '   Scanning for silent sections...');
-            event.reply('log', '');
+            console.log(`   • Audio codec: ${audioStream.codec_name}`);
+            console.log(`   • Sample rate: ${audioStream.sample_rate}Hz`);
+            console.log(`   • Channels: ${audioStream.channels}`);
+            console.log(`   • Duration: ${metadata.format.duration.toFixed(2)}s`);
+            console.log('');
+            console.log('🔎 Starting audio analysis...');
+            console.log('   Scanning for silent sections...');
+            console.log('');
 
             // Proceed with silence detection
             let analysisProgress = 0;
@@ -1108,16 +1108,16 @@ async function detectSilence(inputFile, params, event) {
                 .audioFilters(`silencedetect=noise=${params.silenceDb}dB:d=${params.minSilenceDuration}`)
                 .output('-')
                 .on('start', command => {
-                    event.reply('log', '▶️  FFmpeg command started');
-                    event.reply('log', `   Command: silencedetect filter with noise=${params.silenceDb}dB`);
-                    event.reply('log', '');
+                    console.log('▶️  FFmpeg command started');
+                    console.log(`   Command: silencedetect filter with noise=${params.silenceDb}dB`);
+                    console.log('');
                 })
                 .on('stderr', line => {
                     // Log progress
                     if (line.includes('time=')) {
                         const timeMatch = line.match(/time=([\d:.]+)/);
                         if (timeMatch && analysisProgress++ % 10 === 0) {
-                            event.reply('log', `   ⏱️  Processing: ${timeMatch[1]}`);
+                            console.log(`   ⏱️  Processing: ${timeMatch[1]}`);
                          const parts = timeMatch[1].split(':').map(Number);
                          const secs = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : 0;
                          if (totalDurationSec > 0 && secs > 0) {
@@ -1134,21 +1134,21 @@ async function detectSilence(inputFile, params, event) {
 
                     if (silenceStart) {
                         startTime = parseFloat(silenceStart[1]);
-                        event.reply('log', `   🔇 Silence START detected at ${startTime.toFixed(3)}s`);
+                        console.log(`   🔇 Silence START detected at ${startTime.toFixed(3)}s`);
                     }
                     if (silenceEnd && startTime !== null) {
                         const endTime = parseFloat(silenceEnd[1]);
-                        event.reply('log', `   🔊 Silence END detected at ${endTime.toFixed(3)}s`);
+                        console.log(`   🔊 Silence END detected at ${endTime.toFixed(3)}s`);
                         
                         const paddingDur = parseFloat(params.paddingDuration);
                         const adjustedStart = startTime + paddingDur;
                         const adjustedEnd = endTime - paddingDur;
                         const duration = adjustedEnd - adjustedStart;
                         
-                        event.reply('log', `   📏 Calculating adjusted range:`);
-                        event.reply('log', `      • Original: ${startTime.toFixed(3)}s → ${endTime.toFixed(3)}s (${(endTime - startTime).toFixed(3)}s)`);
-                        event.reply('log', `      • Padding applied: +${paddingDur}s / -${paddingDur}s`);
-                        event.reply('log', `      • Adjusted: ${adjustedStart.toFixed(3)}s → ${adjustedEnd.toFixed(3)}s (${duration.toFixed(3)}s)`);
+                        console.log(`   📏 Calculating adjusted range:`);
+                        console.log(`      • Original: ${startTime.toFixed(3)}s → ${endTime.toFixed(3)}s (${(endTime - startTime).toFixed(3)}s)`);
+                        console.log(`      • Padding applied: +${paddingDur}s / -${paddingDur}s`);
+                        console.log(`      • Adjusted: ${adjustedStart.toFixed(3)}s → ${adjustedEnd.toFixed(3)}s (${duration.toFixed(3)}s)`);
                         
                         // Only add if duration is positive and meaningful
                         if (duration > 0.05) {  // Minimum 50ms (düşürüldü - daha fazla kesim için)
@@ -1156,36 +1156,36 @@ async function detectSilence(inputFile, params, event) {
                                 start: adjustedStart,
                                 end: adjustedEnd
                             });
-                            event.reply('log', `      ✅ ACCEPTED: Silence range #${silenceRanges.length} added`);
+                            console.log(`      ✅ ACCEPTED: Silence range #${silenceRanges.length} added`);
                         } else {
-                            event.reply('log', `      ⚠️  REJECTED: Duration too short (< 0.1s)`);
+                            console.log(`      ⚠️  REJECTED: Duration too short (< 0.1s)`);
                         }
-                        event.reply('log', '');
+                        console.log('');
                         startTime = null;
                     }
                 })
                 .on('end', () => {
-                    event.reply('log', '');
+                    console.log('');
                     event.reply('log', '✅ ANALYSIS COMPLETE');
                     event.reply('log', `   • Total silence ranges found: ${silenceRanges.length}`);
                     if (silenceRanges.length > 0) {
                         const totalSilence = silenceRanges.reduce((sum, r) => sum + (r.end - r.start), 0);
-                        event.reply('log', `   • Total silence duration: ${totalSilence.toFixed(2)}s`);
-                        event.reply('log', `   • Average silence length: ${(totalSilence / silenceRanges.length).toFixed(2)}s`);
-                        event.reply('log', '');
-                        event.reply('log', '📋 Silence ranges to remove:');
+                        console.log(`   • Total silence duration: ${totalSilence.toFixed(2)}s`);
+                        console.log(`   • Average silence length: ${(totalSilence / silenceRanges.length).toFixed(2)}s`);
+                        console.log('');
+                        console.log('📋 Silence ranges to remove:');
                         silenceRanges.forEach((range, i) => {
-                            event.reply('log', `   ${i + 1}. ${range.start.toFixed(3)}s → ${range.end.toFixed(3)}s (${(range.end - range.start).toFixed(3)}s)`);
+                            console.log(`   ${i + 1}. ${range.start.toFixed(3)}s → ${range.end.toFixed(3)}s (${(range.end - range.start).toFixed(3)}s)`);
                         });
                     }
-                    event.reply('log', '═══════════════════════════════════════');
+                    console.log('═══════════════════════════════════════');
                     resolve(silenceRanges);
                 })
                 .on('error', (err) => {
-                    event.reply('log', '');
+                    console.log('');
                     event.reply('log', '❌ ERROR during silence detection');
-                    event.reply('log', `   ${err.message}`);
-                    event.reply('log', '═══════════════════════════════════════');
+                    console.log(`   ${err.message}`);
+                    console.log('═══════════════════════════════════════');
                     reject(err);
                 })
                 .run();
@@ -1198,53 +1198,53 @@ function calculateNonSilentSegments(silenceRanges, totalDuration, event) {
     const segments = [];
     const MIN_SEGMENT_DURATION = 0.05; // 50ms minimum (düşürüldü)
     
-    event.reply('log', '');
-    event.reply('log', '═══════════════════════════════════════');
-    event.reply('log', '📐 CALCULATING NON-SILENT SEGMENTS');
-    event.reply('log', '═══════════════════════════════════════');
+    console.log('');
+    console.log('═══════════════════════════════════════');
+    console.log('📐 CALCULATING NON-SILENT SEGMENTS');
+    console.log('═══════════════════════════════════════');
     
     // Add first segment if video doesn't start with silence
     if (silenceRanges.length === 0) {
         // No silence detected, return entire video
-        event.reply('log', '⚠️  No silence ranges detected');
-        event.reply('log', `   → Keeping entire video (0.000s → ${totalDuration.toFixed(3)}s)`);
-        event.reply('log', '═══════════════════════════════════════');
+        console.log('⚠️  No silence ranges detected');
+        console.log(`   → Keeping entire video (0.000s → ${totalDuration.toFixed(3)}s)`);
+        console.log('═══════════════════════════════════════');
         return [{ start: 0, end: totalDuration }];
     }
     
-    event.reply('log', `📊 Input data:`);
-    event.reply('log', `   • Total video duration: ${totalDuration.toFixed(3)}s`);
-    event.reply('log', `   • Silence ranges to remove: ${silenceRanges.length}`);
-    event.reply('log', `   • Min segment duration: ${MIN_SEGMENT_DURATION}s`);
-    event.reply('log', '');
+    console.log(`📊 Input data:`);
+    console.log(`   • Total video duration: ${totalDuration.toFixed(3)}s`);
+    console.log(`   • Silence ranges to remove: ${silenceRanges.length}`);
+    console.log(`   • Min segment duration: ${MIN_SEGMENT_DURATION}s`);
+    console.log('');
     
     // First segment (start to first silence)
-    event.reply('log', '🔍 Analyzing segment boundaries:');
-    event.reply('log', '');
-    event.reply('log', '1️⃣  FIRST SEGMENT (video start → first silence)');
+    console.log('🔍 Analyzing segment boundaries:');
+    console.log('');
+    console.log('1️⃣  FIRST SEGMENT (video start → first silence)');
     if (silenceRanges[0].start > MIN_SEGMENT_DURATION) {
         segments.push({
             start: 0,
             end: silenceRanges[0].start
         });
-        event.reply('log', `   ✅ KEEP: 0.000s → ${silenceRanges[0].start.toFixed(3)}s`);
-        event.reply('log', `   Duration: ${silenceRanges[0].start.toFixed(3)}s`);
+        console.log(`   ✅ KEEP: 0.000s → ${silenceRanges[0].start.toFixed(3)}s`);
+        console.log(`   Duration: ${silenceRanges[0].start.toFixed(3)}s`);
     } else {
         event.reply('log', `   ❌ SKIP: Too short (${silenceRanges[0].start.toFixed(3)}s < ${MIN_SEGMENT_DURATION}s)`);
     }
-    event.reply('log', '');
+    console.log('');
     
     // Middle segments (between silences)
     if (silenceRanges.length > 1) {
-        event.reply('log', '🔄 MIDDLE SEGMENTS (between silence ranges)');
+        console.log('🔄 MIDDLE SEGMENTS (between silence ranges)');
         for (let i = 0; i < silenceRanges.length - 1; i++) {
             const segStart = silenceRanges[i].end;
             const segEnd = silenceRanges[i + 1].start;
             const duration = segEnd - segStart;
             
-            event.reply('log', `   Segment ${i + 1}:`);
-            event.reply('log', `      Range: ${segStart.toFixed(3)}s → ${segEnd.toFixed(3)}s`);
-            event.reply('log', `      Duration: ${duration.toFixed(3)}s`);
+            console.log(`   Segment ${i + 1}:`);
+            console.log(`      Range: ${segStart.toFixed(3)}s → ${segEnd.toFixed(3)}s`);
+            console.log(`      Duration: ${duration.toFixed(3)}s`);
             
             // Only add if segment is meaningful
             if (duration > MIN_SEGMENT_DURATION) {
@@ -1252,47 +1252,47 @@ function calculateNonSilentSegments(silenceRanges, totalDuration, event) {
                     start: segStart,
                     end: segEnd
                 });
-                event.reply('log', `      ✅ KEEP`);
+                console.log(`      ✅ KEEP`);
             } else {
                 event.reply('log', `      ❌ SKIP: Too short (< ${MIN_SEGMENT_DURATION}s)`);
             }
-            event.reply('log', '');
+            console.log('');
         }
     }
     
     // Last segment (last silence to end)
-    event.reply('log', '🏁 FINAL SEGMENT (last silence → video end)');
+    console.log('🏁 FINAL SEGMENT (last silence → video end)');
     const lastSilence = silenceRanges[silenceRanges.length - 1];
     const lastSegmentDuration = totalDuration - lastSilence.end;
     
-    event.reply('log', `   Range: ${lastSilence.end.toFixed(3)}s → ${totalDuration.toFixed(3)}s`);
-    event.reply('log', `   Duration: ${lastSegmentDuration.toFixed(3)}s`);
+    console.log(`   Range: ${lastSilence.end.toFixed(3)}s → ${totalDuration.toFixed(3)}s`);
+    console.log(`   Duration: ${lastSegmentDuration.toFixed(3)}s`);
     
     if (lastSegmentDuration > MIN_SEGMENT_DURATION) {
         segments.push({
             start: lastSilence.end,
             end: totalDuration
         });
-        event.reply('log', `   ✅ KEEP`);
+        console.log(`   ✅ KEEP`);
     } else {
         event.reply('log', `   ❌ SKIP: Too short (< ${MIN_SEGMENT_DURATION}s)`);
     }
     
-    event.reply('log', '');
-    event.reply('log', '📊 SUMMARY:');
-    event.reply('log', `   • Total segments to keep: ${segments.length}`);
+    console.log('');
+    console.log('📊 SUMMARY:');
+    console.log(`   • Total segments to keep: ${segments.length}`);
     const totalKeptDuration = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
     const removedDuration = totalDuration - totalKeptDuration;
     const reductionPercent = (removedDuration / totalDuration * 100).toFixed(1);
-    event.reply('log', `   • Total kept duration: ${totalKeptDuration.toFixed(2)}s`);
-    event.reply('log', `   • Total removed duration: ${removedDuration.toFixed(2)}s`);
-    event.reply('log', `   • Video reduction: ${reductionPercent}%`);
-    event.reply('log', '');
-    event.reply('log', '📋 Segments list:');
+    console.log(`   • Total kept duration: ${totalKeptDuration.toFixed(2)}s`);
+    console.log(`   • Total removed duration: ${removedDuration.toFixed(2)}s`);
+    console.log(`   • Video reduction: ${reductionPercent}%`);
+    console.log('');
+    console.log('📋 Segments list:');
     segments.forEach((seg, i) => {
-        event.reply('log', `   ${i + 1}. ${seg.start.toFixed(3)}s → ${seg.end.toFixed(3)}s (${(seg.end - seg.start).toFixed(3)}s)`);
+        console.log(`   ${i + 1}. ${seg.start.toFixed(3)}s → ${seg.end.toFixed(3)}s (${(seg.end - seg.start).toFixed(3)}s)`);
     });
-    event.reply('log', '═══════════════════════════════════════');
+    console.log('═══════════════════════════════════════');
     
     return segments;
 }
@@ -1316,17 +1316,17 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                     return reject(new Error('No video stream found'));
                 }
                 
-                event.reply('log', `📊 Input Duration: ${totalDuration.toFixed(2)}s`);
-                event.reply('log', `📹 Video: ${videoStream.codec_name} ${videoStream.width}x${videoStream.height} @ ${videoStream.r_frame_rate} fps`);
+                console.log(`📊 Input Duration: ${totalDuration.toFixed(2)}s`);
+                console.log(`📹 Video: ${videoStream.codec_name} ${videoStream.width}x${videoStream.height} @ ${videoStream.r_frame_rate} fps`);
                 if (audioStream) {
-                    event.reply('log', `🔊 Audio: ${audioStream.codec_name} ${audioStream.sample_rate}Hz ${audioStream.channels}ch`);
+                    console.log(`🔊 Audio: ${audioStream.codec_name} ${audioStream.sample_rate}Hz ${audioStream.channels}ch`);
                 }
                 
                 // Audio normalization info
                 if (params.normalizeAudio) {
-                    event.reply('log', `🎚️  Audio Normalization: Enabled (Target: -16 LUFS)`);
+                    console.log(`🎚️  Audio Normalization: Enabled (Target: -16 LUFS)`);
                 } else {
-                    event.reply('log', `🎚️  Audio Normalization: Disabled`);
+                    console.log(`🎚️  Audio Normalization: Disabled`);
                 }
                 
                 // Calculate non-silent segments
@@ -1339,7 +1339,7 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                 
                 const expectedOutputDuration = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
                 const reductionPercent = ((totalDuration - expectedOutputDuration) / totalDuration * 100).toFixed(1);
-                event.reply('log', `📊 Expected output: ${expectedOutputDuration.toFixed(2)}s (${reductionPercent}% reduction)`);
+                console.log(`📊 Expected output: ${expectedOutputDuration.toFixed(2)}s (${reductionPercent}% reduction)`);
                 
                 // Create temp directory for segments
                 const tempDir = path.join(path.dirname(outputFile), '.klyppr_temp');
@@ -1347,10 +1347,10 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                 
                 try {
                     // Extract each segment (parallel batch processing)
-                    event.reply('log', '');
-                    event.reply('log', '═══════════════════════════════════════');
-                    event.reply('log', '✂️  PHASE 2: SEGMENT EXTRACTION');
-                    event.reply('log', '═══════════════════════════════════════');
+                    console.log('');
+                    console.log('═══════════════════════════════════════');
+                    console.log('✂️  PHASE 2: SEGMENT EXTRACTION');
+                    console.log('═══════════════════════════════════════');
                     // Dynamic batch size: GPU can handle more parallel jobs than CPU
                     const cpuCount = os.cpus().length;
                     const isGPU = gpuEncoderConfig.name !== 'libx264';
@@ -1358,14 +1358,14 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                         ? Math.min(8, cpuCount)                          // GPU: limited by GPU VRAM/throughput
                         : Math.min(6, Math.max(2, Math.floor(cpuCount / 2))); // CPU: leave headroom for system
 
-                    event.reply('log', `📊 Extraction plan:`);
-                    event.reply('log', `   • Total segments: ${segments.length}`);
-                    event.reply('log', `   • Encoder: ${gpuEncoderConfig.label}`);
-                    event.reply('log', `   • CPU cores: ${cpuCount}`);
-                    event.reply('log', `   • Batch size: ${BATCH_SIZE} segments (parallel)`);
-                    event.reply('log', `   • Temp directory: ${tempDir}`);
-                    event.reply('log', `   • Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
-                    event.reply('log', '');
+                    console.log(`📊 Extraction plan:`);
+                    console.log(`   • Total segments: ${segments.length}`);
+                    console.log(`   • Encoder: ${gpuEncoderConfig.label}`);
+                    console.log(`   • CPU cores: ${cpuCount}`);
+                    console.log(`   • Batch size: ${BATCH_SIZE} segments (parallel)`);
+                    console.log(`   • Temp directory: ${tempDir}`);
+                    console.log(`   • Normalization: ${params.normalizeAudio ? 'ENABLED' : 'DISABLED'}`);
+                    console.log('');
                     const segmentFiles = [];
 
                     // Prepare segment file paths
@@ -1382,8 +1382,8 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                         const batchSegments = segments.slice(i, batchEnd);
                         const batchFiles = segmentFiles.slice(i, batchEnd);
                         
-                        event.reply('log', '');
-                        event.reply('log', `📦 BATCH ${Math.floor(i / BATCH_SIZE) + 1}: Segments ${i + 1}-${batchEnd}`);
+                        console.log('');
+                        console.log(`📦 BATCH ${Math.floor(i / BATCH_SIZE) + 1}: Segments ${i + 1}-${batchEnd}`);
                         
                         // Process batch in parallel
                         await Promise.all(
@@ -1398,20 +1398,20 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                             status: `Extracted ${processedCount}/${segments.length} segments...`,
                             percent: parseFloat(segmentProgress)
                         });
-                        event.reply('log', '');
-                        event.reply('log', `   ✅ Batch ${Math.floor(i / BATCH_SIZE) + 1} complete (${processedCount}/${segments.length} total)`);
+                        console.log('');
+                        console.log(`   ✅ Batch ${Math.floor(i / BATCH_SIZE) + 1} complete (${processedCount}/${segments.length} total)`);
                     }
                     
-                    event.reply('log', '');
-                    event.reply('log', `✅ All ${segments.length} segments extracted successfully`);
-                    event.reply('log', '═══════════════════════════════════════');
+                    console.log('');
+                    console.log(`✅ All ${segments.length} segments extracted successfully`);
+                    console.log('═══════════════════════════════════════');
                     
                     // Concatenate segments
-                    event.reply('log', '');
-                    event.reply('log', '═══════════════════════════════════════');
-                    event.reply('log', '🔗 PHASE 3: CONCATENATION');
-                    event.reply('log', '═══════════════════════════════════════');
-                    event.reply('log', `📊 Merging ${segments.length} segments into final video...`);
+                    console.log('');
+                    console.log('═══════════════════════════════════════');
+                    console.log('🔗 PHASE 3: CONCATENATION');
+                    console.log('═══════════════════════════════════════');
+                    console.log(`📊 Merging ${segments.length} segments into final video...`);
                     event.reply('progress', {
                         status: 'Merging segments...',
                         percent: 50
@@ -1420,14 +1420,14 @@ async function processVideo(inputFile, outputFile, silenceRanges, params, event)
                     await concatenateSegments(segmentFiles, outputFile, params, event);
                     
                     // Cleanup temp files
-                    event.reply('log', '');
-                    event.reply('log', '🧹 Cleaning up temporary files...');
-                    event.reply('log', `   Removing: ${tempDir}`);
+                    console.log('');
+                    console.log('🧹 Cleaning up temporary files...');
+                    console.log(`   Removing: ${tempDir}`);
                     await fs.remove(tempDir);
-                    event.reply('log', `   ✓ Cleanup complete`);
-                    event.reply('log', '');
-                    event.reply('log', '✅ VIDEO PROCESSING COMPLETED SUCCESSFULLY!');
-                    event.reply('log', '═══════════════════════════════════════');
+                    console.log(`   ✓ Cleanup complete`);
+                    console.log('');
+                    console.log('✅ VIDEO PROCESSING COMPLETED SUCCESSFULLY!');
+                    console.log('═══════════════════════════════════════');
                     event.reply('progress', {
                         status: 'Complete!',
                         percent: 100
@@ -1469,10 +1469,10 @@ function processVideoFast(inputFile, outputFile, segments, params, event) {
         const selectExpr = selectParts.join('+');
 
         const _pvfStart = Date.now();
-        event.reply('log', '');
+        console.log('');
         event.reply('log', '⚡ SINGLE-PASS: select filter (no temp files)');
-        event.reply('log', `   Segments: ${segments.length} | one ffmpeg call | encoder: ${gpuEncoderConfig.label}`);
-        event.reply('log', '');
+        console.log(`   Segments: ${segments.length} | one ffmpeg call | encoder: ${gpuEncoderConfig.label}`);
+        console.log('');
 
         const hw = hwaccelInputOptions();
         let cudaFailed = false;
@@ -1492,8 +1492,8 @@ function processVideoFast(inputFile, outputFile, segments, params, event) {
                 '-movflags', '+faststart', '-max_muxing_queue_size', '9999'
             ])
             .on('start', (cmd) => {
-                event.reply('log', '▶️  FFmpeg single-pass started');
-                event.reply('log', '   CMD: ' + cmd.slice(0, 300));
+                console.log('▶️  FFmpeg single-pass started');
+                console.log('   CMD: ' + cmd.slice(0, 300));
             })
             .on('stderr', line => {
                 if (line.includes('Failed setup for format cuda') ||
@@ -1511,7 +1511,7 @@ function processVideoFast(inputFile, outputFile, segments, params, event) {
             })
             .on('end', () => {
                 if (hw.length) {
-                    event.reply('log', '   Decode: ' + (cudaFailed ? 'CPU (CUDA soft-fail)' : 'GPU (' + hw[1] + ')'));
+                    console.log('   Decode: ' + (cudaFailed ? 'CPU (CUDA soft-fail)' : 'GPU (' + hw[1] + ')'));
                 }
                 event.reply('log', `   Encode: ${gpuEncoderConfig.label}`);
                 event.reply('log', `✅ Single-pass complete in ${((Date.now()-_pvfStart)/1000).toFixed(2)}s`);
@@ -1540,11 +1540,11 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
     return new Promise((resolve, reject) => {
         const duration = endTime - startTime;
         
-        event.reply('log', `      ▶️  Extracting segment:`);
-        event.reply('log', `         • Start: ${startTime.toFixed(3)}s`);
-        event.reply('log', `         • End: ${endTime.toFixed(3)}s`);
-        event.reply('log', `         • Duration: ${duration.toFixed(3)}s`);
-        event.reply('log', `         • Output: ${path.basename(outputFile)}`);
+        console.log(`      ▶️  Extracting segment:`);
+        console.log(`         • Start: ${startTime.toFixed(3)}s`);
+        console.log(`         • End: ${endTime.toFixed(3)}s`);
+        console.log(`         • Duration: ${duration.toFixed(3)}s`);
+        console.log(`         • Output: ${path.basename(outputFile)}`);
         
         // Use accurate seeking: -ss after -i for precise cuts
         let cudaDecodeFailed = false;
@@ -1552,16 +1552,16 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
         
         // Audio filter - apply loudness normalization if enabled
         if (params.normalizeAudio) {
-            event.reply('log', `         • Normalization: ENABLED (-16 LUFS)`);
+            console.log(`         • Normalization: ENABLED (-16 LUFS)`);
             command.audioFilters([
                 'loudnorm=I=-16:TP=-1.5:LRA=11' // YouTube standard: -16 LUFS, True Peak -1.5dB
             ]);
         } else {
-            event.reply('log', `         • Normalization: DISABLED`);
+            console.log(`         • Normalization: DISABLED`);
         }
         
         const segmentVideoOpts = gpuEncoderConfig.segmentOptions(20);
-        event.reply('log', `         • Encoder: ${gpuEncoderConfig.label}`);
+        console.log(`         • Encoder: ${gpuEncoderConfig.label}`);
 
         command
             .outputOptions([
@@ -1577,7 +1577,7 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
                 '-max_muxing_queue_size', '9999'
             ])
             .on('start', (cmd) => {
-                event.reply('log', `         • FFmpeg started`);
+                console.log(`         • FFmpeg started`);
             })
             .on('progress', () => {
                 // No per-frame log — avoids IPC spam on long segments
@@ -1587,7 +1587,7 @@ function extractSegment(inputFile, outputFile, startTime, endTime, params, event
                 reject(err);
             })
             .on('end', () => {
-                event.reply('log', `         ✅ Complete`);
+                console.log(`         ✅ Complete`);
                 resolve();
             })
             .save(outputFile);
@@ -1599,8 +1599,8 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
     return new Promise(async (resolve, reject) => {
         try {
             // Verify all segment files exist
-            event.reply('log', '');
-            event.reply('log', '🔍 Verifying segment files...');
+            console.log('');
+            console.log('🔍 Verifying segment files...');
             let totalSize = 0;
             for (let i = 0; i < segmentFiles.length; i++) {
                 const exists = await fs.pathExists(segmentFiles[i]);
@@ -1611,9 +1611,9 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                 const stats = await fs.stat(segmentFiles[i]);
                 const sizeMB = stats.size / 1024 / 1024;
                 totalSize += sizeMB;
-                event.reply('log', `  ✓ Segment ${(i + 1).toString().padStart(2, '0')}: ${sizeMB.toFixed(2)} MB - ${path.basename(segmentFiles[i])}`);
+                console.log(`  ✓ Segment ${(i + 1).toString().padStart(2, '0')}: ${sizeMB.toFixed(2)} MB - ${path.basename(segmentFiles[i])}`);
             }
-            event.reply('log', `  📊 Total size: ${totalSize.toFixed(2)} MB`);
+            console.log(`  📊 Total size: ${totalSize.toFixed(2)} MB`);
             
             // Create concat list file with proper Windows path handling
             const concatListFile = path.join(path.dirname(outputFile), '.concat_list.txt');
@@ -1627,10 +1627,10 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
             }).join('\n');
             
             await fs.writeFile(concatListFile, concatContent, 'utf8');
-            event.reply('log', '');
-            event.reply('log', `📝 Created concat list file:`);
-            event.reply('log', `   Path: ${concatListFile}`);
-            event.reply('log', `   Segments: ${segmentFiles.length}`);
+            console.log('');
+            console.log(`📝 Created concat list file:`);
+            console.log(`   Path: ${concatListFile}`);
+            console.log(`   Segments: ${segmentFiles.length}`);
             
             // Use concat demuxer to merge segments
             const command = ffmpeg()
@@ -1641,15 +1641,15 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                 ]);
             
             // NOTE: Do NOT apply normalization here - segments are already normalized!
-            event.reply('log', '');
+            console.log('');
             const finalVideoOpts = gpuEncoderConfig.finalOptions(18);
-            event.reply('log', '⚙️  Concatenation settings:');
-            event.reply('log', `   • Video encoder: ${gpuEncoderConfig.label}`);
-            event.reply('log', `   • Audio codec: AAC 192k`);
-            event.reply('log', `   • Normalization: Already applied to segments`);
-            event.reply('log', `   • ℹ️  Concat only merges - no re-normalization`);
-            event.reply('log', '   • Sync: CFR (constant frame rate)');
-            event.reply('log', '');
+            console.log('⚙️  Concatenation settings:');
+            console.log(`   • Video encoder: ${gpuEncoderConfig.label}`);
+            console.log(`   • Audio codec: AAC 192k`);
+            console.log(`   • Normalization: Already applied to segments`);
+            console.log(`   • ℹ️  Concat only merges - no re-normalization`);
+            console.log('   • Sync: CFR (constant frame rate)');
+            console.log('');
 
             command
                 .outputOptions([
@@ -1660,16 +1660,16 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                     '-max_muxing_queue_size', '9999'
                 ])
                 .on('start', (cmd) => {
-                    event.reply('log', '▶️  FFmpeg concatenation started');
-                    event.reply('log', `   Input: ${segmentFiles.length} segment files`);
-                    event.reply('log', `   Output: ${path.basename(outputFile)}`);
-                    event.reply('log', '');
+                    console.log('▶️  FFmpeg concatenation started');
+                    console.log(`   Input: ${segmentFiles.length} segment files`);
+                    console.log(`   Output: ${path.basename(outputFile)}`);
+                    console.log('');
                     event.reply('progress', { status: 'Concatenating segments...', percent: 75 });
                 })
                 .on('progress', (progress) => {
                     if (progress.percent) {
                         const totalPercent = 50 + (progress.percent / 2);
-                        event.reply('log', `   ⏱️  Merging progress: ${progress.percent.toFixed(1)}%`);
+                        console.log(`   ⏱️  Merging progress: ${progress.percent.toFixed(1)}%`);
                         event.reply('progress', {
                             status: `Merging: ${progress.percent.toFixed(1)}%`,
                             percent: totalPercent
@@ -1678,21 +1678,21 @@ function concatenateSegments(segmentFiles, outputFile, params, event) {
                 })
                 .on('error', async (err) => {
                     await fs.remove(concatListFile).catch(() => {});
-                    event.reply('log', '');
+                    console.log('');
                     event.reply('log', `❌ ERROR: Concatenation failed`);
-                    event.reply('log', `   ${err.message}`);
+                    console.log(`   ${err.message}`);
                     reject(err);
                 })
                 .on('end', async () => {
                     await fs.remove(concatListFile).catch(() => {});
-                    event.reply('log', '');
-                    event.reply('log', '✅ Concatenation successful!');
+                    console.log('');
+                    console.log('✅ Concatenation successful!');
                     
                     // Get output file size
                     try {
                         const outputStats = await fs.stat(outputFile);
                         const outputSizeMB = outputStats.size / 1024 / 1024;
-                        event.reply('log', `   Final video size: ${outputSizeMB.toFixed(2)} MB`);
+                        console.log(`   Final video size: ${outputSizeMB.toFixed(2)} MB`);
                     } catch (e) {}
                     
                     resolve();
