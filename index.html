@@ -452,13 +452,16 @@
             if (result.success) {
                 currentOutputFile = result.outputFile;
                 
-                // İşlem tamamlandığında progress bar'ı %100'e tamamla
+                // Complete progress bar to 100%
                 document.getElementById('progressBar').style.width = '100%';
                 
-                // Modal göster
+                // Auto-open the output folder so the user immediately sees their file
+                ipcRenderer.send('show-in-folder', result.outputFile);
+                
+                // Show completion modal
                 showCompletionModal();
                 
-                // 1 saniye sonra progress'i gizle
+                // Hide progress bar after 1 second
                 setTimeout(() => {
                     document.getElementById('progress').style.display = 'none';
                     document.getElementById('progressBar').style.width = '0%';

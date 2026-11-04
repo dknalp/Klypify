@@ -85,6 +85,27 @@ async function setupFFmpegBinaries() {
     if (!fs.existsSync(ffmpegPath) || !fs.existsSync(ffprobePath)) {
         console.error('FFmpeg binary not found at:', ffmpegPath);
         console.error('FFprobe binary not found at:', ffprobePath);
+        // Show a user-friendly dialog before crashing so the user knows what to do
+        const { dialog, shell } = require('electron');
+        const installCmds = {
+            win32:  'winget install Gyan.FFmpeg',
+            darwin: 'brew install ffmpeg',
+            linux:  'sudo apt install ffmpeg   (or your distro package manager)',
+        };
+        const installHint = installCmds[process.platform] || 'https://ffmpeg.org/download.html';
+        dialog.showMessageBoxSync({
+            type: 'error',
+            title: 'FFmpeg not found',
+            message: 'Klypify requires FFmpeg to process videos.',
+            detail: `FFmpeg was not found at the expected path.
+
+To install it, run:
+  ${installHint}
+
+Or download it from https://ffmpeg.org/download.html`,
+            buttons: ['Open ffmpeg.org', 'Quit'],
+            defaultId: 0,
+        }) === 0 && shell.openExternal('https://ffmpeg.org/download.html');
         throw new Error('FFmpeg or FFprobe binaries not found.');
     }
 
