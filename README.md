@@ -1,3 +1,5 @@
+<p align="center"><img src="hero.svg" alt="Klypify" width="100%"/></p>
+
 # Klypify
 
 **Automatically cut silence from videos — one click, GPU-accelerated, no cloud.**
