@@ -1,4 +1,4 @@
-<p align="center"><img src="hero.svg" alt="Klypify" width="100%"/></p>
+<p align="center"><img src="hero2.svg" alt="Klypify" width="100%"/></p>
 
 # Klypify
 
