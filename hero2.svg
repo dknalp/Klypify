@@ -1,26 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" role="img" aria-label="Klypify hero">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#080d14"/>
-      <stop offset=".5" stop-color="#0d1520"/>
-      <stop offset="1" stop-color="#111c2a"/>
+      <stop offset="0" stop-color="#0a0714"/>
+      <stop offset=".5" stop-color="#0f0d1d"/>
+      <stop offset="1" stop-color="#14102a"/>
     </linearGradient>
     <radialGradient id="glowA" cx=".82" cy=".18" r=".7">
-      <stop offset="0" stop-color="#3b82f6" stop-opacity=".22"/>
-      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+      <stop offset="0" stop-color="#7c3aed" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="glowB" cx=".12" cy=".9" r=".65">
-      <stop offset="0" stop-color="#8b5cf6" stop-opacity=".18"/>
-      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+      <stop offset="0" stop-color="#2563eb" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3b82f6" stop-opacity="0"/>
-      <stop offset=".5" stop-color="#3b82f6" stop-opacity=".8"/>
-      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+      <stop offset="0" stop-color="#7c3aed" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#7c3aed" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#60a5fa"/>
-      <stop offset="1" stop-color="#a78bfa"/>
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#60a5fa"/>
     </linearGradient>
     <filter id="logoGlow">
       <feGaussianBlur stdDeviation="3" result="blur"/>
@@ -28,51 +28,39 @@
     </filter>
   </defs>
 
-  <!-- background -->
   <rect width="1280" height="420" rx="26" fill="url(#bg)"/>
   <rect width="1280" height="420" rx="26" fill="url(#glowA)"/>
   <rect width="1280" height="420" rx="26" fill="url(#glowB)"/>
 
-  <!-- logo mark: clean scissors + cut line -->
+  <!-- scissors logo -->
   <g transform="translate(584, 42) scale(1.15)" filter="url(#logoGlow)">
-    <!-- top circle handle -->
     <circle cx="38" cy="10" r="8.5" fill="none" stroke="url(#logoGrad)" stroke-width="3.5"/>
-    <!-- bottom circle handle -->
     <circle cx="38" cy="46" r="8.5" fill="none" stroke="url(#logoGrad)" stroke-width="3.5"/>
-    <!-- top blade -->
     <line x1="44.5" y1="13.5" x2="12" y2="28" stroke="url(#logoGrad)" stroke-width="3.5" stroke-linecap="round"/>
-    <!-- bottom blade -->
     <line x1="44.5" y1="42.5" x2="12" y2="28" stroke="url(#logoGrad)" stroke-width="3.5" stroke-linecap="round"/>
-    <!-- pivot dot -->
     <circle cx="12" cy="28" r="3" fill="url(#logoGrad)"/>
-    <!-- dashed cut line -->
-    <line x1="0" y1="28" x2="8" y2="28" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
-    <line x1="50" y1="28" x2="62" y2="28" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 4" opacity="0.5"/>
+    <line x1="0" y1="28" x2="8" y2="28" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="50" y1="28" x2="62" y2="28" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 4" opacity="0.5"/>
   </g>
 
-  <!-- wordmark -->
-  <text x="640" y="206" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="74" font-weight="800" letter-spacing="-2">
-    <tspan fill="#e8f0fe">Klyp</tspan><tspan fill="#3b82f6">ify</tspan>
+  <text x="640" y="206" text-anchor="middle" font-family="'Avenir Next','Segoe UI',Helvetica,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-2">
+    <tspan fill="#ede9fe">Klyp</tspan><tspan fill="#a78bfa">ify</tspan>
   </text>
+  <text x="640" y="244" text-anchor="middle" font-family="'Avenir Next','Segoe UI',Helvetica,Arial,sans-serif" font-size="21" fill="#b8b0d4">Silence removal &#183; GPU-accelerated &#183; Single-pass &#183; No cloud</text>
 
-  <!-- tagline -->
-  <text x="640" y="246" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#94afd4">Silence removal &#183; GPU-accelerated &#183; Single-pass &#183; No cloud</text>
-
-  <!-- divider -->
   <rect x="240" y="276" width="800" height="2" fill="url(#rule)"/>
 
-  <!-- 4 stats evenly spaced -->
-  <g text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif">
-    <text x="358" y="330" font-size="36" font-weight="800" fill="#3b82f6">4</text>
-    <text x="358" y="356" font-size="15" fill="#94afd4">GPU encoders</text>
+  <g text-anchor="middle" font-family="'Avenir Next','Segoe UI',Helvetica,Arial,sans-serif">
+    <text x="358" y="330" font-size="34" font-weight="800" fill="#a78bfa">4</text>
+    <text x="358" y="356" font-size="15" fill="#b8b0d4">GPU encoders</text>
 
-    <text x="554" y="330" font-size="36" font-weight="800" fill="#a78bfa">3</text>
-    <text x="554" y="356" font-size="15" fill="#94afd4">platforms</text>
+    <text x="554" y="330" font-size="34" font-weight="800" fill="#60a5fa">3</text>
+    <text x="554" y="356" font-size="15" fill="#b8b0d4">platforms</text>
 
-    <text x="750" y="330" font-size="36" font-weight="800" fill="#34d399">6+</text>
-    <text x="750" y="356" font-size="15" fill="#94afd4">video formats</text>
+    <text x="750" y="330" font-size="34" font-weight="800" fill="#818cf8">6+</text>
+    <text x="750" y="356" font-size="15" fill="#b8b0d4">video formats</text>
 
-    <text x="946" y="330" font-size="36" font-weight="800" fill="#f472b6">0</text>
-    <text x="946" y="356" font-size="15" fill="#94afd4">cloud dependency</text>
+    <text x="946" y="330" font-size="34" font-weight="800" fill="#c084fc">0</text>
+    <text x="946" y="356" font-size="15" fill="#b8b0d4">cloud dependency</text>
   </g>
 </svg>
