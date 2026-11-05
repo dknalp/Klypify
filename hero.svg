@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" role="img" aria-label="Klypify hero">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#080d14"/>
+      <stop offset=".5" stop-color="#0d1520"/>
+      <stop offset="1" stop-color="#111c2a"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx=".82" cy=".18" r=".7">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx=".12" cy=".9" r=".65">
+      <stop offset="0" stop-color="#8b5cf6" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#3b82f6" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="scissorGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60a5fa"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity=".15"/>
+      <stop offset=".5" stop-color="#3b82f6" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity=".15"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1280" height="420" rx="26" fill="url(#bg)"/>
+  <rect width="1280" height="420" rx="26" fill="url(#glowA)"/>
+  <rect width="1280" height="420" rx="26" fill="url(#glowB)"/>
+
+  <!-- waveform bars background decoration (silent = short, loud = tall) -->
+  <g fill="url(#waveGrad)" opacity="0.5">
+    <!-- left side quiet bars -->
+    <rect x="90" y="188" width="6" height="44" rx="3"/>
+    <rect x="100" y="195" width="6" height="30" rx="3"/>
+    <rect x="110" y="182" width="6" height="56" rx="3"/>
+    <rect x="120" y="191" width="6" height="38" rx="3"/>
+    <rect x="130" y="186" width="6" height="48" rx="3"/>
+    <rect x="140" y="197" width="6" height="26" rx="3"/>
+    <rect x="150" y="183" width="6" height="54" rx="3"/>
+    <rect x="160" y="193" width="6" height="34" rx="3"/>
+    <rect x="170" y="189" width="6" height="42" rx="3"/>
+    <rect x="180" y="196" width="6" height="28" rx="3"/>
+    <!-- right side quiet bars -->
+    <rect x="1080" y="192" width="6" height="36" rx="3"/>
+    <rect x="1090" y="185" width="6" height="50" rx="3"/>
+    <rect x="1100" y="194" width="6" height="32" rx="3"/>
+    <rect x="1110" y="188" width="6" height="44" rx="3"/>
+    <rect x="1120" y="197" width="6" height="26" rx="3"/>
+    <rect x="1130" y="183" width="6" height="54" rx="3"/>
+    <rect x="1140" y="191" width="6" height="38" rx="3"/>
+    <rect x="1150" y="186" width="6" height="48" rx="3"/>
+    <rect x="1160" y="195" width="6" height="30" rx="3"/>
+    <rect x="1170" y="189" width="6" height="42" rx="3"/>
+  </g>
+
+  <!-- brand mark: scissors icon -->
+  <g transform="translate(569, 44)" fill="url(#scissorGrad)">
+    <!-- top blade -->
+    <path d="M22 8C22 11.31 19.31 14 16 14C14.37 14 12.9 13.33 11.84 12.26L6 18L4 16L10.26 9.74C10.1 9.19 10 8.6 10 8C10 4.69 12.69 2 16 2C19.31 2 22 4.69 22 8ZM16 10C17.1 10 18 9.1 18 8C18 6.9 17.1 6 16 6C14.9 6 14 6.9 14 8C14 9.1 14.9 10 16 10Z"/>
+    <!-- bottom blade -->
+    <path d="M22 36C22 32.69 19.31 30 16 30C14.37 30 12.9 30.67 11.84 31.74L6 26L4 28L10.26 34.26C10.1 34.81 10 35.4 10 36C10 39.31 12.69 42 16 42C19.31 42 22 39.31 22 36ZM16 38C14.9 38 14 37.1 14 36C14 34.9 14.9 34 16 34C17.1 34 18 34.9 18 36C18 37.1 17.1 38 16 38Z"/>
+    <!-- cut line dashes -->
+    <rect x="22" y="20" width="10" height="4" rx="2" opacity="0.7"/>
+    <rect x="38" y="20" width="10" height="4" rx="2" opacity="0.5"/>
+    <rect x="54" y="20" width="10" height="4" rx="2" opacity="0.3"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="640" y="206" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="74" font-weight="800" letter-spacing="-2">
+    <tspan fill="#e8f0fe">Klyp</tspan><tspan fill="#3b82f6">ify</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="640" y="246" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#94afd4">
+    Silence removal &#183; GPU-accelerated &#183; Single-pass &#183; No cloud
+  </text>
+
+  <!-- divider rule -->
+  <rect x="240" y="276" width="800" height="2" fill="url(#rule)"/>
+
+  <!-- stats -->
+  <g text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif">
+    <!-- GPU encoders -->
+    <text x="262" y="330" font-size="36" font-weight="800" fill="#3b82f6">4</text>
+    <text x="262" y="356" font-size="15" fill="#94afd4">GPU encoders</text>
+
+    <!-- platforms -->
+    <text x="494" y="330" font-size="36" font-weight="800" fill="#a78bfa">3</text>
+    <text x="494" y="356" font-size="15" fill="#94afd4">platforms</text>
+
+    <!-- video formats -->
+    <text x="720" y="330" font-size="36" font-weight="800" fill="#34d399">6+</text>
+    <text x="720" y="356" font-size="15" fill="#94afd4">video formats</text>
+
+    <!-- pipeline -->
+    <text x="946" y="330" font-size="36" font-weight="800" fill="#fb923c">1&#x2011;pass</text>
+    <text x="946" y="356" font-size="15" fill="#94afd4">FFmpeg pipeline</text>
+
+    <!-- zero cloud -->
+    <text x="1118" y="330" font-size="36" font-weight="800" fill="#f472b6">0</text>
+    <text x="1118" y="356" font-size="15" fill="#94afd4">cloud dependency</text>
+  </g>
+</svg>
